@@ -24,7 +24,7 @@ wchar_t name[22][2] = {
     L"八",L"九",L"十",L"化",L"千",L"孔",L"己",
     L"土",L"子",L"上",L"大",L"人",L"可",L"知",L"礼"
 };
-enum type { hand = '0', mydzf, nextdzf, enddzf, notis, throwncd, errorturn, errorop,statuss };
+enum type { hand = '0', mydzf, nextdzf, enddzf, notis, throwncd, errorturn, errorop,statuss,win,loss };
 std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
 std::wstring wideString;
 bool test = true;
@@ -301,20 +301,14 @@ LRESULT CALLBACK WndProc_game(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
         break;
     
     case WM_CLOSE:
-        // 关闭客户端socket
         g_terminateThread = true;
         closesocket(clientSocket);
-        PostQuitMessage(0);
-        //DestroyWindow(hWnd);
-        //DestroyWindow(mhWnd);
         WSACleanup();
-        
-        SendMessage(mhWnd, WM_QUIT, 0, 0);
-        break;
-
+        DestroyWindow(hWnd);
+        ShowWindow(mhWnd, SW_SHOWNORMAL);
         break;
     case WM_RECEIVED_MESSAGE:
-        mtype = static_cast<type>(wParam); // 从 WPARAM 中检索 msgtype
+        mtype = (type)(*(char*)(wParam)); // 从 WPARAM 中检索 msgtype
         Buffer = converter.from_bytes(reinterpret_cast<const char*>(lParam) + 1);
         switch (mtype) {
         case hand:
@@ -351,12 +345,20 @@ LRESULT CALLBACK WndProc_game(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
             SetWindowText(dzf3, L"");
             SetWindowText(dzf3, Buffer.c_str());
             break;
-
+        case win:
+            MessageBox(hWnd, L"恭喜您胡牌！游戏结束", L"胜利", 0);
+            PostMessage(hWnd, WM_CLOSE, 0, 0);
+            break;
+        case loss:
+            MessageBox(hWnd, Buffer.c_str(), L"失败", 0);
+            PostMessage(hWnd, WM_CLOSE, 0, 0);
+            break;
         default:
             break;
         }
         // 释放分配的内存
         delete[] reinterpret_cast<char*>(lParam);
+        delete (char*)wParam;
         break;
     case WM_COMMAND:
     {
@@ -407,13 +409,14 @@ void ReceiveMessages(HWND hWnd) {
         }
         // 处理接收到的消息
         receiveBuffer[bytesRead] = '\0'; // 添加字符串结束符
-        msgtype = receiveBuffer[0];
+        //msgtype = receiveBuffer[0];
 
         // Allocate memory for a copy of the received message and msgtype
-        char* messageCopy = new char[BUFFER_SIZE];
+        char* messageCopy = new char[BUFFER_SIZE];        
         memcpy(messageCopy, receiveBuffer, BUFFER_SIZE);
+        char* msgtypecopy = new char(messageCopy[0]);
 
         // 发送自定义消息到主窗口，将复制的消息指针和msgtype传递给PostMessage
-        PostMessage(hWnd, WM_RECEIVED_MESSAGE, static_cast<WPARAM>(msgtype), reinterpret_cast<LPARAM>(messageCopy));
+        PostMessage(hWnd, WM_RECEIVED_MESSAGE, (WPARAM)(msgtypecopy), reinterpret_cast<LPARAM>(messageCopy));
     }
 }
