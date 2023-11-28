@@ -52,6 +52,7 @@ bool g_terminateThread = false;
 int bytesRead;
 char msgtype;
 type mtype;
+const char* DELIMITER = "##";
 
 // 此代码模块中包含的函数的前向声明:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -403,20 +404,32 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 // 接收服务器消息的函数
 void ReceiveMessages(HWND hWnd) {
     while (!g_terminateThread) {
-        bytesRead = recv(clientSocket, receiveBuffer, sizeof(receiveBuffer), 0);
+        // 接收数据到缓冲区
+        bytesRead = recv(clientSocket, receiveBuffer, sizeof(receiveBuffer) - 1, 0);
         if (bytesRead <= 0) {
+            MessageBox(hWnd, L"服务器断开连接", L"连接断开", 0);
+            PostMessage(hWnd, WM_CLOSE, 0, 0);
             break;
         }
+
+        // 在接收到的数据末尾添加字符串结束符
+        receiveBuffer[bytesRead] = '\0';
+
         // 处理接收到的消息
-        receiveBuffer[bytesRead] = '\0'; // 添加字符串结束符
-        //msgtype = receiveBuffer[0];
+        char* token = strtok(receiveBuffer, "##");
+        while (token != NULL) {
+            // Allocate memory for a copy of the received message and msgtype
+            char* messageCopy = new char[strlen(token) + 1];
+            strcpy(messageCopy, token);
 
-        // Allocate memory for a copy of the received message and msgtype
-        char* messageCopy = new char[BUFFER_SIZE];        
-        memcpy(messageCopy, receiveBuffer, BUFFER_SIZE);
-        char* msgtypecopy = new char(messageCopy[0]);
+            // 获取消息类型
+            char* msgtypecopy = new char(token[0]);
 
-        // 发送自定义消息到主窗口，将复制的消息指针和msgtype传递给PostMessage
-        PostMessage(hWnd, WM_RECEIVED_MESSAGE, (WPARAM)(msgtypecopy), reinterpret_cast<LPARAM>(messageCopy));
+            // 发送自定义消息到主窗口
+            PostMessage(hWnd, WM_RECEIVED_MESSAGE, (WPARAM)(msgtypecopy), reinterpret_cast<LPARAM>(messageCopy));
+
+            // 获取下一个消息
+            token = strtok(NULL, "##");
+        }
     }
 }
